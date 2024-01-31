@@ -1,11 +1,174 @@
-################################################################################
-# Server logic of the Shiny app
-#
-# Author: Stefan Schliebs
-# Created: 2020-03-13 09:21:18
-################################################################################
+rm(list=ls())
+
+library(tidyr)
+library(shiny)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(ggthemes)
+library(DT)
+library(plotly)
+library(zoo)
+
+cra_color = "#4e79a7"
+msl_color = "#d27dcf"
+
+barrier_red = "#e05759"
+rs_blue = "#4d78a5"
 
 
+
+#setwd("C:/Users/BRAKSAX/Documents/site-engagement/ASCENT app")
+
+
+heatmap <-             read.csv("heatmap.csv") %>% 
+  filter(!is.na(STUDY_NUM)) %>% 
+  filter(year > 2000) %>% 
+  mutate(Date = as.Date(paste0(year,"-",month,"-","01"),"%Y-%b-%d"))
+glmm_window_results <- read.csv("glmm_window_results.csv")
+glmm_decay_results <-  read.csv("glmm_decay_output.csv")
+glmm_recruitment   <-  read.csv("recruitment_glmm_df.csv")
+ascent_heatmap     <-  read.csv("ascent_heatmap_final.csv",check.names = F)
+
+min_msl_df = heatmap %>% filter(event=="MSL") %>%
+  filter(cnt>0) %>% 
+  group_by(STUDY_NUM)%>%
+  summarise(min_msl = min(Date)) %>% 
+  ungroup()
+
+min_cra_df = heatmap %>% filter(event=="CRA") %>%
+  filter(cnt>0) %>% 
+  group_by(STUDY_NUM)%>%
+  summarise(min_cra = min(Date)) %>% 
+  ungroup()
+
+min_screens_df = heatmap %>% filter(event=="screens") %>%
+  filter(cnt>0) %>% 
+  group_by(STUDY_NUM)%>%
+  summarise(min_screen = min(Date)) %>% 
+  ungroup()
+
+print(heatmap)
+
+max_date_df = heatmap %>% 
+  group_by(STUDY_NUM) %>%
+  #summarise(max_date=min(as.Date(LAST_SUBJECT_SCREENED_DATE),
+  #                    Sys.Date(),max(Date,na.rm=T),na.rm=T
+  #       )
+  #) %>%
+  summarise(max_date = Sys.Date()) %>% 
+  ungroup()
+
+
+min_date = min_msl_df %>% full_join(min_cra_df) %>% full_join(min_screens_df) %>%
+  group_by(STUDY_NUM) %>% 
+  mutate(`Min Date` = max(min_msl,min_cra,min_screen,na.rm=T)) %>%
+  select(STUDY_NUM,`Min Date`) %>% 
+  ungroup()
+
+swimlane_input = min_msl_df %>% 
+  full_join(min_cra_df) %>% 
+  full_join(min_screens_df) %>%
+  full_join(max_date_df) %>% 
+  group_by(STUDY_NUM) %>%
+  mutate(min_date = min(min_msl,min_cra,min_screen,na.rm=T)) %>% 
+  ungroup() %>% 
+  pivot_longer(cols = !c(STUDY_NUM,min_date),names_to = "Event",values_to = "Date")
+
+min_date = min_msl_df %>% full_join(min_cra_df) %>% full_join(min_screens_df) %>%
+  group_by(STUDY_NUM) %>% 
+  mutate(`Min Date` = max(min_msl,min_cra,min_screen,na.rm=T)) %>%
+  select(STUDY_NUM,`Min Date`) %>% 
+  ungroup()
+
+swimlane_input = min_msl_df %>% 
+  full_join(min_cra_df) %>% 
+  full_join(min_screens_df) %>%
+  full_join(max_date_df) %>% 
+  group_by(STUDY_NUM) %>%
+  mutate(min_date = min(min_msl,min_cra,min_screen,na.rm=T)) %>% 
+  ungroup() %>% 
+  pivot_longer(cols = !c(STUDY_NUM,min_date),names_to = "Event",values_to = "Date")
+
+# Define UI for app that draws a histogram ----
+ui <- fluidPage(
+  
+  navbarPage(paste("Engagement Strategy Efficacy Dashboard"),
+             
+             #tags$main(tags$h2("Get Window Dimensions Example"),
+             #tags$p("Resize the browser."),
+             #verbatimTextOutput("winSize")),
+             tags$script(src = "index.js"),
+             
+             navbarMenu("Menu",
+                        tabPanel("Heatmap",
+                                 fluidRow(
+                                   selectInput(inputId = "study_heatmap",
+                                               label = "Select Study(s)",
+                                               choices = unique(ascent_heatmap$STUDY_NUM),
+                                               selected = unique(ascent_heatmap$STUDY_NUM)[1],
+                                               multiple = T
+                                   ),
+                                 ),
+                                 fluidRow(
+                                   DTOutput('heatmap_table'),
+                                   plotlyOutput('heatmap_lc')
+                                 )
+
+                        ),
+                        tabPanel("Overall Efficacy Signals",
+                                fluidRow(
+                                  column(width=8,selectInput(inputId = "study_ascent",
+                                             label = "Select Study(s)",
+                                             choices = c(unique(glmm_decay_results$study)),
+                                             selected = "AbbVie Overall",
+                                             multiple=T
+                                        )),
+                                  column(width=4,selectInput(inputId="function_select", 
+                                                             label="Select CRM Functions(s)", 
+                                                             choices = c("CRA","MSL"),
+                                                             selected = c("CRA","MSL"),
+                                                             multiple=T
+                                  )),
+                                ),
+                                fluidRow(
+                                    column(width=6,plotlyOutput(outputId = "window_plot")),
+                                    column(width=6,plotlyOutput(outputId = "decay_plot"))
+                                )
+                        ),
+                        tabPanel("Recruitment Strategies/Barriers",
+                                 fluidRow(
+                                   column(width=4,selectInput(inputId = "study_ascent2",
+                                                              label = "Select Study(s)",
+                                                              choices = c(unique(glmm_recruitment$Study)),
+                                                              selected = "AbbVie Overall",
+                                                              multiple=T
+                                   )),
+                                   column(width=4,selectInput(inputId="topic_type_select", 
+                                                              label="Select Topic Type(s)", 
+                                                              choices = unique(glmm_recruitment$regressor_type),
+                                                              selected = unique(glmm_recruitment$regressor_type),
+                                                              multiple=T
+                                   )),
+                                   #column(width=4,selectInput(inputId="topic_select", 
+                                   #                            label="Select Topic(s)", 
+                                   #                            choices = unique(glmm_recruitment$Regressor),
+                                   #                            selected = unique(glmm_recruitment$Regressor),
+                                   #                            multiple=T
+                                   # ))
+                                 ),
+                                 fluidRow(
+                                 plotlyOutput(outputId = "rs_plot")                         
+                                 )
+                        )
+             )
+  ),
+  
+  
+)
+
+
+# Define server logic required to draw a histogram ----
 server <- function(input, output, session) {
   
   #observe any changes to window size
@@ -21,7 +184,7 @@ server <- function(input, output, session) {
   #   
   # })
   
-  
+
   
   observeEvent(input[["study_ascent"]],
                {
@@ -63,13 +226,13 @@ server <- function(input, output, session) {
                        "Average Estimate: ", round(Estimate,2),"<br>",
                        "Upper 95%: ", round(mult_upper_95,2),"<br>"
                      )
-                 )) +
+                     )) +
       #geom_point()+
       geom_hline(aes(yintercept = 1))+
       facet_wrap(~Study,nrow=1)+
       geom_crossbar(aes(ymin=mult_lower_95,ymax=mult_upper_95,fill=Type
-      ),alpha=0.5,width=0.8,
-      fatten=1.5)+
+                    ),alpha=0.5,width=0.8,
+                    fatten=1.5)+
       #scale_color_manual(values = c("Barrier" = barrier_red, "Recruitment Strategy" = rs_blue) ) +
       scale_fill_manual(values = c("Barrier" = barrier_red, "Recruitment Strategy" = rs_blue) ) +
       labs(title="Multiplicative Effect Size of Engagement on Screen Rate",
@@ -89,9 +252,9 @@ server <- function(input, output, session) {
                         rename(Study = STUDY_NUM) %>% 
                         filter(Study %in% input$study_heatmap),aes(x=Date,y=Study)) + 
       geom_line() + geom_point(aes(shape=Event,fill=Event),
-                               size = 2,
+                              size = 2,
                                #position = "jitter"
-      ) + 
+                               ) + 
       scale_y_discrete(limits = rev)+ 
       theme_hc()
     
@@ -106,7 +269,7 @@ server <- function(input, output, session) {
                        `Min Date`, `Max Date`, `CRA Attribution Window`, 
                        `MSL Attribution Window`,`ASCENT Eligible`),
               options = list(dom='t')
-    )
+              )
     
   })
   
@@ -146,7 +309,7 @@ server <- function(input, output, session) {
                                   text=paste0("Date: ",Date,"<br>",
                                               "Event: ",event,"<br>",
                                               "Count: ",cnt,"<br>")
-    ))+
+                                  ))+
       geom_line()+
       geom_point()+
       #geom_segment(aes(x = `Min Date`, y = 0, xend = `Min Date`, yend = max_cnt*0.9),inherit.aes = F)+
@@ -200,16 +363,16 @@ server <- function(input, output, session) {
     
     decay_plot = ggplot(data=glmm_decay_results_long %>% left_join(auc_df) %>% left_join(halflife_df)
                         
-    )+
+      )+
       geom_line(aes(x=time,y=value,color=Engagement
       )) + 
       geom_point(aes(x=time,y=value,color=Engagement,text = paste0("Engagement: ", Engagement,"<br>",
-                                                                   "Days: ", time, "<br>",
-                                                                   "Y (lower 95%): ", round(lower,2),"<br>",
-                                                                   "Average Estimate: ", round(value,2),"<br>",
-                                                                   "Y (upper 95%): ", round(upper,2),"<br>",
-                                                                   "AUC: ",round(AUC,2),"<br>",
-                                                                   "Half-Life:",round(HalfLife,2),"<br>"
+                                    "Days: ", time, "<br>",
+                                    "Y (lower 95%): ", round(lower,2),"<br>",
+                                    "Average Estimate: ", round(value,2),"<br>",
+                                    "Y (upper 95%): ", round(upper,2),"<br>",
+                                    "AUC: ",round(AUC,2),"<br>",
+                                    "Half-Life:",round(HalfLife,2),"<br>"
       )),size=0.1)+
       geom_ribbon(aes(x=time,ymin=lower,ymax=upper,fill=Engagement),alpha=0.4) + 
       scale_fill_manual(values = c("cra" = cra_color, "msl" = msl_color))+
@@ -269,8 +432,8 @@ server <- function(input, output, session) {
                                       "Lower 95%: ", round(mult_lower_95,2),"<br>",
                                       "Avg Multiplier: ", round(avg_mult,2), "<br>",
                                       "Upper 95%: ", round(mult_upper_95,2),"<br>"
-                        ) 
-      ),width=0.8,alpha=0.5)+
+                                      ) 
+                          ),width=0.8,alpha=0.5)+
       scale_fill_manual(values = c("CRA Window" = cra_color, "MSL Window" = msl_color))+
       #scale_color_manual(values = c("CRA Window" = cra_color, "MSL Window" = msl_color) ) +
       labs(title="Multiplicative Effect Size of Engagement on Screen Rate",
@@ -289,4 +452,5 @@ server <- function(input, output, session) {
   
 }
 
+shinyApp(ui, server)
 
