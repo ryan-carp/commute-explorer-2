@@ -1,0 +1,13 @@
+name: test_flight_app
+title: test_flight_app
+username: CARPERX2
+account: CARPERX2
+server: 10.46.220.15
+hostUrl: http://10.46.220.15:8080/__api__
+appId: 1123
+bundleId: 6461
+url: http://10.46.220.15:8080/content/1123/
+when: 1707928667.95077
+lastSyncTime: 1707928667.95078
+asMultiple: FALSE
+asStatic: FALSE

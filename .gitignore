@@ -1,6 +1,4 @@
-.*
-renv/library
-renv/staging
-data
-app/rsconnect
 .Rproj.user
+.Rhistory
+.RData
+.Ruserdata

@@ -5,86 +5,51 @@
 # Created: 2020-03-04 09:34:50
 ################################################################################
 
+library(bslib)
 
 # Commute Explorer UI -----------------------------------------------------
 
-commute_explorer_ui  <- fluidPage(
+commute_explorer_ui <- page_sidebar( 
   
-  navbarPage(paste("Engagement Strategy Efficacy Dashboard"),
-             
-             #tags$main(tags$h2("Get Window Dimensions Example"),
-             #tags$p("Resize the browser."),
-             #verbatimTextOutput("winSize")),
-             tags$script(src = "index.js"),
-             
-             navbarMenu("Menu",
-                        tabPanel("Heatmap",
-                                 fluidRow(
-                                   selectInput(inputId = "study_heatmap",
-                                               label = "Select Study(s)",
-                                               choices = unique(ascent_heatmap$STUDY_NUM),
-                                               selected = unique(ascent_heatmap$STUDY_NUM)[1],
-                                               multiple = T
-                                   ),
-                                 ),
-                                 fluidRow(
-                                   DTOutput('heatmap_table'),
-                                   plotlyOutput('heatmap_lc')
-                                 )
-                                 
-                        ),
-                        tabPanel("Overall Efficacy Signals",
-                                 fluidRow(
-                                   column(width=8,selectInput(inputId = "study_ascent",
-                                                              label = "Select Study(s)",
-                                                              choices = c(unique(glmm_decay_results$study)),
-                                                              selected = "AbbVie Overall",
-                                                              multiple=T
-                                   )),
-                                   column(width=4,selectInput(inputId="function_select", 
-                                                              label="Select CRM Functions(s)", 
-                                                              choices = c("CRA","MSL"),
-                                                              selected = c("CRA","MSL"),
-                                                              multiple=T
-                                   )),
-                                 ),
-                                 fluidRow(
-                                   column(width=6,plotlyOutput(outputId = "window_plot")),
-                                   column(width=6,plotlyOutput(outputId = "decay_plot"))
-                                 )
-                        ),
-                        tabPanel("Recruitment Strategies/Barriers",
-                                 fluidRow(
-                                   column(width=4,selectInput(inputId = "study_ascent2",
-                                                              label = "Select Study(s)",
-                                                              choices = c(unique(glmm_recruitment$Study)),
-                                                              selected = "AbbVie Overall",
-                                                              multiple=T
-                                   )),
-                                   column(width=4,selectInput(inputId="topic_type_select", 
-                                                              label="Select Topic Type(s)", 
-                                                              choices = unique(glmm_recruitment$regressor_type),
-                                                              selected = unique(glmm_recruitment$regressor_type),
-                                                              multiple=T
-                                   )),
-                                   #column(width=4,selectInput(inputId="topic_select", 
-                                   #                            label="Select Topic(s)", 
-                                   #                            choices = unique(glmm_recruitment$Regressor),
-                                   #                            selected = unique(glmm_recruitment$Regressor),
-                                   #                            multiple=T
-                                   # ))
-                                 ),
-                                 fluidRow(
-                                   plotlyOutput(outputId = "rs_plot")                         
-                                 )
-                        )
-             )
+  
+  # Set the CSS theme
+  theme = bs_theme(bg = "#101010", # black
+                   fg = "#E69F00", #white 
+                   primary = "#E69F00", # orange 
+                   secondary = "#0072B2", # blue 
+                   success = "#009E73"), #green 
+  
+  
+  # Add title
+  title = "Engagement Strategy Eficacy Dashboard", 
+  
+  
+  # Add sidebar elements
+  sidebar = sidebar(
+    #class = "bg-secondary",
+    sidebar_content
   ),
   
+  # nav_item(
+  #   input_dark_mode(id = "dark_mode", mode = "light")
+  # ), 
+  
+  # Layout non-sidebar elements
+  
+  layout_column_wrap(
+    width = 1/2,
+    heights_equal = "row",
+    height = "950px",
+    card(full_screen = TRUE,card_header("Overall Effect of Engagement", class = "h6 bg-primary"),
+         plotlyOutput("line")),
+    card(full_screen = TRUE,card_header("Effect Size of Engagement on Screen Rate", class = "h6 bg-primary"),
+         plotlyOutput("bar")),
+    card(full_screen = TRUE,card_header("Barriers on Screen Rate", class = "h6 bg-primary"),
+         plotlyOutput("plot")),
+    card(full_screen = TRUE,card_header("Decaying Effect over Time", class = "h6 bg-primary"),
+         plotlyOutput("last")))
   
 )
-
-
 
 # App template ------------------------------------------------------------
 
